@@ -1,8 +1,8 @@
-1.  groups:
-2.    - name: sentinel_alerts
-3.      rules:
-4.      - alert: HighCPUUsage
-5.        expr: rate(process_cpu_seconds_total[1m]) * 100 > 80
-6.        for: 10s
-7.        annotations:
-8.          summary: "Instance CPU is unusually high"
+groups:
+  - name: sentinel_alerts
+    rules:
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total[1m]) * 100 > 10
+        for: 10s
+        annotations:
+          summary: "Instance CPU is unusually high"

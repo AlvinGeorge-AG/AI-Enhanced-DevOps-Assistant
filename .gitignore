@@ -1,1 +1,2 @@
 # Prevents uploading secrets/logs to GitHub
+.env

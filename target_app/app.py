@@ -1,28 +1,37 @@
 # A simple Python web server that exposes /metrics
-1.  from flask import Flask
-2.  from prometheus_client import make_wsgi_app, Counter, Histogram
-3.  from werkzeug.middleware.dispatcher import DispatcherMiddleware
-4.  import time
-5.  import math
-6.  
-7.  app = Flask(__name__)
-8.  
-9.  # Add prometheus wsgi middleware to route /metrics requests
-10. app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
-11.     '/metrics': make_wsgi_app()
-12. })
-13. 
-14. @app.route('/')
-15. def hello():
-16.     return "Target App is Running!"
-17. 
-18. @app.route('/cpu-spike')
-19. def cpu_spike():
-20.     # Simulate a CPU-heavy task for testing alerts
-21.     end_time = time.time() + 10  # Run for 10 seconds
-22.     while time.time() < end_time:
-23.         math.factorial(10000) 
-24.     return "CPU Spike Triggered!"
-25. 
-26. if __name__ == '__main__':
-27.     app.run(host='0.0.0.0', port=5000)
+from flask import Flask
+from prometheus_client import make_wsgi_app
+from werkzeug.middleware.dispatcher import DispatcherMiddleware
+import time
+import math
+import threading
+
+app = Flask(__name__)
+
+# Add prometheus wsgi middleware to route /metrics requests
+app.wsgi_app = DispatcherMiddleware(app.wsgi_app, {
+    '/metrics': make_wsgi_app()
+})
+
+def background_cpu_spike():
+    """This runs in the background so Nginx doesn't timeout"""
+    end_time = time.time() + 90
+    while time.time() < end_time:
+        math.factorial(5000)  # Much harder math
+        time.sleep(0.001)     # Tiny micro-nap so Prometheus can still scrape
+
+@app.route('/')
+def hello():
+    return "Target App is Running!"
+
+@app.route('/cpu-spike')
+def cpu_spike():
+    # Start the heavy math on a separate background thread
+    thread = threading.Thread(target=background_cpu_spike)
+    thread.start()
+    
+    # Return immediately to avoid the 504 Timeout!
+    return "CPU Spike triggered in the background! Check Prometheus."
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)

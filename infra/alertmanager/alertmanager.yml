@@ -1,8 +1,8 @@
 # Holds the threshold rules and webhook target
-1.  route:
-2.    receiver: 'sentinel_webhook'
-3.  
-4.  receivers:
-5.    - name: 'sentinel_webhook'
-6.      webhook_configs:
-7.        - url: 'http://sentinel_api:8000/webhook'
+route:
+  receiver: 'sentinel_webhook'
+
+receivers:
+  - name: 'sentinel_webhook'
+    webhook_configs:
+      - url: 'http://sentinel_api:8000/webhook'
