@@ -4,6 +4,8 @@ services:
     build: ./target_app
     expose:
       - "5000"
+    cpus: 0.10       # Hard limit: Only gets 10% of a single CPU core!
+    mem_limit: 128m       # Hard limit: Maxes out at exactly 128 Megabytes of RAM
 
   nginx:
     image: nginx:alpine
