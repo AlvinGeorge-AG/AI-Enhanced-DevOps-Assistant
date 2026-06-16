@@ -30,3 +30,17 @@ services:
       - "9093:9093"
     volumes:
       - ./infra/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+
+  sentinel_api:
+    build: 
+      context: ./src
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app
+      # 1. Give the API the keys to your laptop's Docker engine
+      - /var/run/docker.sock:/var/run/docker.sock
+      # 2. Give it access to the compose file so it can run the scale command
+      - ./:/project_root
+      # 3. Give it access to rewrite the load balancer configuration
+      - ./infra/nginx:/etc/nginx_shared
