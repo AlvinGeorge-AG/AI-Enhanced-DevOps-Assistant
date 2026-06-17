@@ -4,8 +4,8 @@ services:
     build: ./target_app
     expose:
       - "5000"
-    cpus: 0.10       # Hard limit: Only gets 10% of a single CPU core!
-    mem_limit: 128m       # Hard limit: Maxes out at exactly 128 Megabytes of RAM
+    cpus: 0.10   
+    mem_limit: 300m    # Hard limit: Only gets 10% of a single CPU core! Hard limit: Maxes out at exactly 128 Megabytes of RAM
 
   nginx:
     image: nginx:alpine
@@ -36,6 +36,8 @@ services:
       context: ./src
     ports:
       - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1   # <--- Forces real-time printing
     volumes:
       - ./src:/app
       # 1. Give the API the keys to your laptop's Docker engine
