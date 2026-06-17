@@ -3,8 +3,7 @@ services:
   app:
     build: ./target_app
     expose:
-      - "5000"
-    cpus: 0.10   
+      - "5000"  
     mem_limit: 300m    # Hard limit: Only gets 10% of a single CPU core! Hard limit: Maxes out at exactly 128 Megabytes of RAM
 
   nginx:
