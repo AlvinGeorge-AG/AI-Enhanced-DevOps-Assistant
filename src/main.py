@@ -39,7 +39,7 @@ def scheduled_health_check():
 @app.on_event("startup")
 def start_scheduler():
     scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_health_check, 'interval', minutes=1)
+    scheduler.add_job(scheduled_health_check, 'interval', minutes=3)
     scheduler.start()
 
 if __name__ == "__main__":

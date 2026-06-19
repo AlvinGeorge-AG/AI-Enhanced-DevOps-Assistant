@@ -1,7 +1,11 @@
+# The hardcoded if/else rules to validate AI output.
+#
 # This is the last line of defense before a decision reaches the executor
 # and actually touches running infrastructure. Nothing here calls an LLM;
 # everything is plain, deterministic Python so it's easy to reason about
 # and impossible for a bad model output to talk its way around.
+
+import time
 
 VALID_ACTIONS = {"scale_up", "scale_down", "restart_container", "no_action"}
 
@@ -17,6 +21,20 @@ MAX_REPLICAS = 5
 HIGH_CPU_THRESHOLD = 70.0
 LOW_CPU_THRESHOLD = 20.0
 HIGH_ERROR_RATE_THRESHOLD = 5.0
+
+# --- Cooldown -----------------------------------------------------------
+# Without this, the cron job (or rapid webhook alerts) can trigger repeated
+# scale_up/scale_down actions seconds apart. Each one spins up or tears down
+# a real Docker container, so a feedback loop here can exhaust a laptop's
+# RAM/CPU in minutes. This module-level timestamp tracks the last time an
+# actual infrastructure-changing action was allowed through, independent of
+# whether it's running inside the webhook route or the scheduled job.
+COOLDOWN_SECONDS = 120
+_last_action_time = 0.0
+
+# Actions that change infrastructure and therefore need to respect the
+# cooldown. "no_action" and rejected/no-op decisions never need to wait.
+ACTIONS_REQUIRING_COOLDOWN = {"scale_up", "scale_down", "restart_container"}
 
 
 def _safe_decision(reason: str) -> dict:
@@ -97,6 +115,22 @@ def validate_decision(decision: dict, system_state: dict) -> dict:
                 f"Rejected: scale_down requested but CPU usage ({cpu}%) is not low enough "
                 f"to justify removing a replica. Overriding LLM decision."
             )
+
+    # --- 5. Cooldown -----------------------------------------------------
+    # This runs last, after everything else has already approved the
+    # decision, so we only "spend" the cooldown window on actions that were
+    # otherwise valid. Rejected/no_action decisions never touch this timer.
+    global _last_action_time
+    if action in ACTIONS_REQUIRING_COOLDOWN:
+        now = time.time()
+        seconds_since_last = now - _last_action_time
+        if seconds_since_last < COOLDOWN_SECONDS:
+            return _safe_decision(
+                f"Rejected: cooldown active. Last infrastructure change was "
+                f"{seconds_since_last:.0f}s ago; must wait {COOLDOWN_SECONDS}s between actions. "
+                f"Original reasoning was: {reason}"
+            )
+        _last_action_time = now
 
     # Passed every check; the original decision is allowed through unchanged.
     return decision
