@@ -18,28 +18,28 @@ from brain.safety_engine import validate_decision
 # Try a few different fake states to see how the brain + safety engine react.
 SCENARIOS = {
     "high_cpu_should_scale_up": {
-        "cpu_usage_percent": 91.5,
-        "memory_usage_mb": 850,
+        "cpu_usage_percent": 9.5,
+        "memory_usage_mb": 8,
         "error_rate_percent": 6.2,
         "active_replicas": 2,
     },
     "idle_should_scale_down": {
-        "cpu_usage_percent": 4.0,
+        "cpu_usage_percent": 9.0,
         "memory_usage_mb": 120,
         "error_rate_percent": 0.0,
         "active_replicas": 3,
     },
     "healthy_should_no_action": {
-        "cpu_usage_percent": 35.0,
-        "memory_usage_mb": 400,
+        "cpu_usage_percent": 3.0,
+        "memory_usage_mb": 1000,
         "error_rate_percent": 0.5,
         "active_replicas": 2,
     },
     "already_at_min_replicas": {
-        "cpu_usage_percent": 5.0,
+        "cpu_usage_percent": 95.0,
         "memory_usage_mb": 100,
         "error_rate_percent": 0.0,
-        "active_replicas": 1,
+        "active_replicas": 6,
     },
 }
 

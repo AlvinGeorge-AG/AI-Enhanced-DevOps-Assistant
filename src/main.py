@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from api.routes import router
 from apscheduler.schedulers.background import BackgroundScheduler
-from api.context_builder import ContextBuilder  # <--- UPDATED IMPORT
+from api.context_builder import ContextBuilder 
 from brain.llm_client import LLMClient
 from brain.safety_engine import validate_decision
 from executor.action_engine import ActionEngine
@@ -35,6 +35,7 @@ def scheduled_health_check():
         action_engine.execute(safe_decision)
     else:
         print(f"✅ CRON: No action needed. ({safe_decision['reason']})")
+
 
 @app.on_event("startup")
 def start_scheduler():

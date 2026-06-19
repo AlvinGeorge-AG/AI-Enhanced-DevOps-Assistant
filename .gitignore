@@ -1,2 +1,7 @@
 # Prevents uploading secrets/logs to GitHub
 .env
+
+.venv/
+
+__pycache__/
+*.py[cod]
