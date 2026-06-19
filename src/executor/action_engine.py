@@ -53,17 +53,17 @@ class ActionEngine:
         
         # 6. Build the Nginx configuration block
         nginx_config = f"""events {{}}
-http {{
-    upstream app_backend {{
-{upstreams}    }}
-    server {{
-        listen 80;
-        location / {{
-            proxy_pass http://app_backend;
-        }}
-    }}
-}}"""
-        
+        http {{
+            upstream app_backend {{
+        {upstreams}    }}
+            server {{
+                listen 80;
+                location / {{
+                    proxy_pass http://app_backend;
+                }}
+            }}
+        }}"""
+                
         # 7. Overwrite and smoothly reload the load balancer
         with open("/etc/nginx_shared/nginx.conf", "w") as f:
             f.write(nginx_config)
