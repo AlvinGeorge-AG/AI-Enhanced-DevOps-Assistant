@@ -10,9 +10,10 @@ class ContextBuilder:
         
         # The exact PromQL queries we want to ask Prometheus
         queries = {
-            "cpu_usage_percent": 'rate(process_cpu_seconds_total[1m]) * 100',
-            "memory_usage_mb": 'process_resident_memory_bytes / 1024 / 1024',
+            "cpu_usage_percent": 'avg(rate(process_cpu_seconds_total[1m])) * 100',
+            "memory_usage_mb": 'sum(process_resident_memory_bytes) / 1024 / 1024',
             "error_rate_percent": 'sum(rate(flask_http_request_duration_seconds_count{status=~"5.."}[1m])) / sum(rate(flask_http_request_duration_seconds_count[1m])) * 100',
+            "request_rate_per_sec": 'sum(rate(flask_http_request_duration_seconds_count[1m]))',
             "active_replicas": 'count(up{job="target_app"})'
         }
 

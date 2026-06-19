@@ -1,29 +1,26 @@
 groups:
   - name: production_alerts
     rules:
-      
-      # 1. SATURATION: CPU SPIKE
+      # 1. SATURATION: CLUSTER AVERAGE CPU SPIKE
       - alert: HighCPUUsage
-        expr: rate(process_cpu_seconds_total[1m]) * 100 > 80
+        expr: avg(rate(process_cpu_seconds_total[1m])) * 100 > 80
         for: 2m
         labels:
           severity: warning
         annotations:
-          summary: "Container CPU has been above 80% for 2 minutes. Possible traffic surge."
+          summary: "Average Cluster CPU has been above 80% for 2 minutes."
 
-      # 2. SATURATION: MEMORY LEAK
+      # 2. SATURATION: TOTAL CLUSTER MEMORY LEAK
       - alert: HighMemoryUsage
-        # process_resident_memory_bytes gives bytes. Divide by 1024 twice to get MB.
-        expr: process_resident_memory_bytes / 1024 / 1024 > 150
+        expr: sum(process_resident_memory_bytes) / 1024 / 1024 > 150
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Container Memory exceeded 150MB. Possible memory leak detected."
+          summary: "Total Cluster Memory exceeded 150MB."
 
       # 3. ERRORS: HIGH HTTP 500 RATE
       - alert: HighErrorRate
-        # Calculates: (500 errors per min) / (Total requests per min) * 100
         expr: sum(rate(flask_http_request_duration_seconds_count{status=~"5.."}[1m])) / sum(rate(flask_http_request_duration_seconds_count[1m])) * 100 > 5
         for: 1m
         labels:
