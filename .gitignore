@@ -1,2 +1,6 @@
 # Prevents uploading secrets/logs to GitHub
 .env
+
+.venv/
+
+src/brain/__pycache__
