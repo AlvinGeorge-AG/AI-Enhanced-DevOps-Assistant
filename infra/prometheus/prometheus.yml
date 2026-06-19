@@ -12,9 +12,28 @@ alerting:
 
 scrape_configs:
   - job_name: 'target_app'
-    # Use Docker's internal DNS to discover ALL dynamically scaled containers
-    dns_sd_configs:
-      - names:
-          - 'app'
-        type: 'A'
-        port: 5000
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Docker SD returns every container on the host. Keep only the ones
+      # belonging to the `app` Compose service (any replica), so we don't
+      # accidentally scrape nginx/prometheus/sentinel_api/etc. as if they
+      # were the target app.
+      - source_labels: [__meta_docker_container_label_com_docker_compose_service]
+        regex: app
+        action: keep
+      # Docker SD's default __address__ uses the container's *first*
+      # exposed port mapping, which may not be the Flask port. Force every
+      # discovered replica to be scraped on port 5000 specifically.
+      - source_labels: [__meta_docker_network_ip]
+        regex: (.+)
+        target_label: __address__
+        replacement: '${1}:5000'
+      # Use each container's actual name (app-1, app-2, app-3, ...) as the
+      # Prometheus "instance" label, so results stay distinguishable
+      # per-replica in queries/logs instead of all looking identical.
+      - source_labels: [__meta_docker_container_name]
+        target_label: instance
+        regex: '/(.*)'
+        replacement: '${1}'

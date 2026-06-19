@@ -6,30 +6,45 @@ PROMETHEUS_URL = "http://prometheus:9090/api/v1/query"
 
 class ContextBuilder:
     async def get_system_state(self) -> dict:
-        """Fetches the 'State of the World' directly from the Prometheus API."""
-        
-        # The exact PromQL queries we want to ask Prometheus
+        """Fetches the 'State of the World' directly from the Prometheus API.
+
+        Now that prometheus.yml uses docker_sd_configs to discover every
+        `app` replica (not just one static hostname), each PromQL query can
+        return multiple time series — one per replica. We aggregate those
+        into a single representative number per metric:
+          - CPU / error rate: averaged across replicas, since the
+            brain reasons about "is the fleet under load", not any single
+            container's number.
+          - Memory / request rate: summed across the cluster to match the Alerting rules.
+          - active_replicas: counted via count(), which is already correct
+            once Prometheus can see every replica.
+        """
+
+        # The exact PromQL queries we want to ask Prometheus.
         queries = {
-            "cpu_usage_percent": 'avg(rate(process_cpu_seconds_total[1m])) * 100',
-            "memory_usage_mb": 'sum(process_resident_memory_bytes) / 1024 / 1024',
-            "error_rate_percent": 'sum(rate(flask_http_request_duration_seconds_count{status=~"5.."}[1m])) / sum(rate(flask_http_request_duration_seconds_count[1m])) * 100',
-            "request_rate_per_sec": 'sum(rate(flask_http_request_duration_seconds_count[1m]))',
-            "active_replicas": 'count(up{job="target_app"})'
+            "cpu_usage_percent": 'avg(rate(process_cpu_seconds_total{job="target_app"}[1m])) * 100',
+            "memory_usage_mb": 'sum(process_resident_memory_bytes{job="target_app"}) / 1024 / 1024',
+            "error_rate_percent": 'sum(rate(flask_http_request_duration_seconds_count{job="target_app", status=~"5.."}[1m])) / sum(rate(flask_http_request_duration_seconds_count{job="target_app"}[1m])) * 100',
+            "request_rate_per_sec": 'sum(rate(flask_http_request_duration_seconds_count{job="target_app"}[1m]))',
+            "active_replicas": 'count(up{job="target_app"} == 1)'
         }
 
         state = {}
-        
+
         # Open an async HTTP client to talk to Prometheus
         async with httpx.AsyncClient() as client:
             for key, query in queries.items():
                 try:
                     response = await client.get(PROMETHEUS_URL, params={"query": query})
                     data = response.json()
-                    
+
                     # Prometheus returns data in a deeply nested JSON structure. We extract the actual number here.
                     results = data.get('data', {}).get('result', [])
                     if results:
-                        # Grab the value and round it to 2 decimal places for the AI
+                        # The PromQL aggregation functions above (avg/sum/count)
+                        # always collapse to exactly one result, so this is
+                        # already the aggregated value across all replicas —
+                        # not just whichever replica happened to be first.
                         value = round(float(results[0]['value'][1]), 2)
                         state[key] = value
                     else:
@@ -37,5 +52,5 @@ class ContextBuilder:
                 except Exception as e:
                     print(f"Error fetching {key}: {e}")
                     state[key] = "error"
-        
+
         return state

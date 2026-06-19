@@ -17,11 +17,15 @@ services:
 
   prometheus:
     image: prom/prometheus
+    user: root
     ports:
       - "9090:9090"
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./infra/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml
+      # Lets Prometheus query the Docker Engine API directly to discover
+      # every replica of the `app` service (docker_sd_configs).
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
   alertmanager:
     image: prom/alertmanager
@@ -38,7 +42,7 @@ services:
     env_file:
       - .env
     environment:
-      - PYTHONUNBUFFERED=1   #Forces real-time printing
+      - PYTHONUNBUFFERED=1   # <--- Forces real-time printing
     volumes:
       - ./src:/app
       # 1. Give the API the keys to your laptop's Docker engine
