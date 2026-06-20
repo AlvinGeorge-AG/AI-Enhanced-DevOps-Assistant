@@ -5,3 +5,7 @@
 
 __pycache__/
 *.py[cod]
+
+# SQLite local databases
+*.db
+*.sqlite3

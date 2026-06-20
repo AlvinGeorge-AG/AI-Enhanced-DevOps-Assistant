@@ -52,12 +52,24 @@ def build_incident_prompt(system_state: dict) -> str:
     memory = system_state.get("memory_usage_mb", "unknown")
     error_rate = system_state.get("error_rate_percent", "unknown")
     replicas = system_state.get("active_replicas", "unknown")
+    history_list = system_state.get("recent_history", [])
+    
+    history_text = ""
+
+    if history_list:
+        history_text = "\nYour Recent Actions (Read this before deciding!):\n"
+        for item in history_list:
+            history_text += f"- [{item['time']}] You decided: '{item['action']}' (Result: {item['status']}). Your logic was: {item['reason']}\n"
+    else:
+        history_text = "\nYour Recent Actions: None yet. This is your first decision.\n"
 
     return f"""Current system state:
-- CPU usage: {cpu}%
-- Memory usage: {memory} MB
-- Error rate: {error_rate}%
-- Active replicas: {replicas}
+              - CPU usage: {cpu}%
+              - Memory usage: {memory} MB
+              - Error rate: {error_rate}%
+              - Active replicas: {replicas}
+              {history_text}
+              Analyze the metrics AND your recent actions. If you just scaled up or restarted recently, 
+              give the system time to stabilize before doing it again. 
 
-What action should be taken? Respond with only the JSON object described in
-your instructions."""
+              What action should be taken? Respond with ONLY the JSON object described in your instructions."""
