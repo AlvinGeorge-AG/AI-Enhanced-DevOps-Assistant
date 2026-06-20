@@ -1,6 +1,6 @@
 # Functions to fetch Prometheus data via HTTP GET
 import httpx
-
+import math
 # We use "prometheus:9090" because Docker automatically resolves the container name to its internal IP!
 PROMETHEUS_URL = "http://prometheus:9090/api/v1/query"
 
@@ -46,6 +46,8 @@ class ContextBuilder:
                         # already the aggregated value across all replicas —
                         # not just whichever replica happened to be first.
                         value = round(float(results[0]['value'][1]), 2)
+                        if math.isnan(value):
+                            value = 0.0
                         state[key] = value
                     else:
                         state[key] = 0.0

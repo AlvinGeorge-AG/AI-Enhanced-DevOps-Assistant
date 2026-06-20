@@ -74,11 +74,12 @@ class ActionEngine:
             print("✅ Action Engine: Nginx traffic routing updated with zero downtime!")
 
     def _restart_unhealthy(self):
-        print("⚡ Action Engine: Scanning for unhealthy containers...")
-        for container in client.containers.list():
-            state = container.attrs.get("State", {})
-            health = state.get("Health", {}).get("Status", "unknown")
+        print("⚡ Action Engine: AI commanded a restart. Rebooting app containers...")
+        # Grab all containers belonging to our app
+        app_containers = client.containers.list(filters={"label": "com.docker.compose.service=app"})
+        
+        for container in app_containers:
+            print(f"🔄 Restarting container: {container.name}")
+            container.restart()
             
-            if health == "unhealthy":
-                print(f"🔄 Restarting corrupted container: {container.name}")
-                container.restart()
+        print("✅ Action Engine: Restart complete.")
