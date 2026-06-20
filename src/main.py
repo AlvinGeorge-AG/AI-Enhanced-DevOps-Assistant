@@ -6,6 +6,8 @@ from api.context_builder import ContextBuilder
 from brain.llm_client import LLMClient
 from brain.safety_engine import validate_decision
 from executor.action_engine import ActionEngine
+from executor.memory import init_db
+from executor.service import process_decision
 import asyncio
 
 app = FastAPI(title="SentinelAI Core API")
