@@ -1,6 +1,7 @@
 # Functions to fetch Prometheus data via HTTP GET
 import httpx
 import math
+from executor.memory import get_recent_logs
 # We use "prometheus:9090" because Docker automatically resolves the container name to its internal IP!
 PROMETHEUS_URL = "http://prometheus:9090/api/v1/query"
 
@@ -55,4 +56,6 @@ class ContextBuilder:
                     print(f"Error fetching {key}: {e}")
                     state[key] = "error"
 
+        state["recent_history"] = get_recent_logs(limit=3)
+        
         return state
