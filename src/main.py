@@ -34,13 +34,24 @@ def scheduled_health_check():
 
     if safe_decision["action"] != "no_action":
         print(f"⚡ CRON: Executing '{safe_decision['action']}'...")
-        action_engine.execute(safe_decision)
+        try:
+            action_engine.execute(safe_decision)
+            # Log the successful infrastructure change!
+            process_decision(safe_decision, state, status="SUCCESS")
+        except Exception as e:
+            # If Docker fails, record the exact error in the DB
+            process_decision(safe_decision, state, status=f"FAILED: {str(e)}")
     else:
         print(f"✅ CRON: No action needed. ({safe_decision['reason']})")
+        # Log routine healthy states so the Copilot Chat knows the app was stable here
+        process_decision(safe_decision, state, status="ROUTINE_CHECK_STABLE")
 
 
 @app.on_event("startup")
-def start_scheduler():
+def startup_events():
+    print("📦 Initializing SQLite Memory Database...")
+    init_db()  # <--- Balamurali's table gets built here!
+    
     scheduler = BackgroundScheduler()
     scheduler.add_job(scheduled_health_check, 'interval', minutes=3)
     scheduler.start()

@@ -1,24 +1,27 @@
 from .memory import save_log
+import json
 
-def process_decision(decision):
-
+def process_decision(decision: dict, system_state: dict, status: str = "SUCCESS"):
     try:
         if not decision:
             return {"status": "failed", "error": "empty decision"}
 
-        required = ["incident", "reasoning", "action"]
-        for key in required:
-            if key not in decision:
-                return {"status": "failed", "error": f"missing {key}"}
+        # Safely grab the AI's 'reason' and map it to 'reasoning' table column
+        action = decision.get("action", "unknown")
+        reasoning = decision.get("reason", "No reasoning provided by AI")
+        
+        # Turn the raw PromQL metric dictionary into a clean string for the log
+        incident_summary = json.dumps(system_state)
 
         save_log(
-            incident=decision["incident"],
-            reasoning=decision["reasoning"],
-            action=decision["action"],
-            status="SUCCESS"
+            incident=incident_summary,
+            reasoning=reasoning,
+            action=action,
+            status=status
         )
 
         return {"status": "executed"}
 
     except Exception as e:
+        print(f"❌ SQLite Storage Error: {e}")
         return {"status": "failed", "error": str(e)}
