@@ -8,6 +8,7 @@ from brain.safety_engine import validate_decision
 from executor.action_engine import ActionEngine
 from executor.memory import init_db, save_log
 import asyncio
+from datetime import datetime, timedelta
 
 app = FastAPI(title="SentinelAI Core API")
 app.include_router(router)
@@ -55,8 +56,10 @@ def scheduled_health_check():
 def start_scheduler():
     init_db()
     scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_health_check, 'interval', minutes=3)
+    first_run = datetime.now() + timedelta(seconds=10)
+    scheduler.add_job(scheduled_health_check, 'interval', minutes=3, next_run_time=first_run)
     scheduler.start()
+    print(f"🚀 Scheduler started. First CRON tick in ~10 seconds (at {first_run.strftime('%H:%M:%S')})...")
 
 if __name__ == "__main__":
     import uvicorn
