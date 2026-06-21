@@ -2,13 +2,14 @@ groups:
   - name: production_alerts
     rules:
       # 1. SATURATION: CLUSTER AVERAGE CPU SPIKE
+      # Shortened windows for local chaos testing (restore [1m]/2m for prod).
       - alert: HighCPUUsage
-        expr: avg(rate(process_cpu_seconds_total[1m])) * 100 > 80
-        for: 2m
+        expr: avg(rate(process_cpu_seconds_total[15s])) * 100 > 75
+        for: 15s
         labels:
           severity: warning
         annotations:
-          summary: "Average Cluster CPU has been above 80% for 2 minutes."
+          summary: "Average Cluster CPU has been above 75% for 15 seconds."
 
       # 2. SATURATION: TOTAL CLUSTER MEMORY LEAK
       - alert: HighMemoryUsage

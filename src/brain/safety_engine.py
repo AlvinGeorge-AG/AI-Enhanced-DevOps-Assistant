@@ -21,20 +21,31 @@ MAX_REPLICAS = 5
 HIGH_CPU_THRESHOLD = 70.0
 LOW_CPU_THRESHOLD = 20.0
 HIGH_ERROR_RATE_THRESHOLD = 5.0
+HIGH_MEMORY_THRESHOLD = 150.0
+
+# Mirror alert_rules.yml `for:` durations so CRON cannot beat Alertmanager
+# by reacting to a single high snapshot before the alert window completes.
+BREACH_DURATIONS_SECONDS = {
+    "cpu": 15,
+    "memory": 60,
+    "error_rate": 60,
+}
+
+# CPU alert threshold in alert_rules.yml (75%) — used for sustained tracking.
+CPU_ALERT_THRESHOLD = 75.0
 
 # --- Cooldown -----------------------------------------------------------
-# Without this, the cron job (or rapid webhook alerts) can trigger repeated
-# scale_up/scale_down actions seconds apart. Each one spins up or tears down
-# a real Docker container, so a feedback loop here can exhaust a laptop's
-# RAM/CPU in minutes. This module-level timestamp tracks the last time an
-# actual infrastructure-changing action was allowed through, independent of
-# whether it's running inside the webhook route or the scheduled job.
 COOLDOWN_SECONDS = 120
 _last_action_time = 0.0
 
 # Actions that change infrastructure and therefore need to respect the
 # cooldown. "no_action" and rejected/no-op decisions never need to wait.
 ACTIONS_REQUIRING_COOLDOWN = {"scale_up", "scale_down", "restart_container"}
+
+# --- Sustained-breach & extinction tracking -----------------------------
+_breach_started_at: dict[str, float] = {}
+_extinction_since: float | None = None
+EXTINCTION_CONFIRM_SECONDS = 15
 
 
 def _safe_decision(reason: str) -> dict:
@@ -48,31 +59,95 @@ def _safe_decision(reason: str) -> dict:
     }
 
 
-def validate_decision(decision: dict, system_state: dict) -> dict:
+def _update_breach_timers(system_state: dict) -> None:
+    """Track when each metric first crossed its alert threshold."""
+    now = time.time()
+    checks = {
+        "cpu": (
+            system_state.get("cpu_usage_percent"),
+            CPU_ALERT_THRESHOLD,
+        ),
+        "memory": (
+            system_state.get("memory_usage_mb"),
+            HIGH_MEMORY_THRESHOLD,
+        ),
+        "error_rate": (
+            system_state.get("error_rate_percent"),
+            HIGH_ERROR_RATE_THRESHOLD,
+        ),
+    }
+
+    for metric, (value, threshold) in checks.items():
+        if isinstance(value, (int, float)) and value > threshold:
+            _breach_started_at.setdefault(metric, now)
+        else:
+            _breach_started_at.pop(metric, None)
+
+
+def _breach_sustained(metric: str) -> bool:
+    started = _breach_started_at.get(metric)
+    if started is None:
+        return False
+    return (time.time() - started) >= BREACH_DURATIONS_SECONDS[metric]
+
+
+def _breach_elapsed(metric: str) -> float:
+    started = _breach_started_at.get(metric)
+    if started is None:
+        return 0.0
+    return time.time() - started
+
+
+def validate_decision(decision: dict, system_state: dict, *, source: str = "cron") -> dict:
     """Validates an LLM decision against structural rules, a confidence
     threshold, and the actual system metrics. Returns either the original
     decision (if it passes every check) or a safe "no_action" fallback.
+
+    source:
+      - "cron"    — background poll; enforce sustained-breach so CRON cannot
+                    beat Alertmanager's `for:` window on a single snapshot.
+      - "webhook" — Alertmanager already waited `for:`; skip sustained-breach.
+      - "chat"    — interactive UI; skip sustained-breach.
 
     This function never raises. Anything malformed or out of bounds is
     treated as a failed check, not a crash.
     """
 
-    replicas = float(system_state.get("active_replicas", 1.0))
+    _update_breach_timers(system_state)
+
+    cpu = system_state.get("cpu_usage_percent")
+    memory = system_state.get("memory_usage_mb")
+    error_rate = system_state.get("error_rate_percent")
+    replicas = system_state.get("active_replicas")
 
     # =========================================================================
     # RULE 0: THE DEFIBRILLATOR (TOTAL EXTINCTION OVERRIDE)
     # =========================================================================
-    if replicas < 1.0:
-        print("\n" + "⚠️"*25)
-        print("🚨 HARD GUARDRAIL INTERCEPTION: TOTAL FLEET EXTINCTION DETECTED! 🚨")
-        print("Bypassing LLM logic. Forcing immediate emergency cold-boot...")
-        print("⚠️"*25 + "\n")
-        
-        return {
-            "action": "scale_up",
-            "reason": "SAFETY OVERRIDE: Active container count dropped to 0. Executing emergency fleet resurrection.",
-            "confidence": 1.0
-        }
+    global _extinction_since
+    if replicas is None:
+        _extinction_since = None
+    elif isinstance(replicas, (int, float)) and replicas < 1.0:
+        now = time.time()
+        if _extinction_since is None:
+            _extinction_since = now
+        if now - _extinction_since >= EXTINCTION_CONFIRM_SECONDS:
+            print("\n" + "⚠️"*25)
+            print("🚨 HARD GUARDRAIL INTERCEPTION: TOTAL FLEET EXTINCTION DETECTED! 🚨")
+            print("Bypassing LLM logic. Forcing immediate emergency cold-boot...")
+            print("⚠️"*25 + "\n")
+            _extinction_since = None
+            return {
+                "action": "scale_up",
+                "reason": "SAFETY OVERRIDE: Active container count dropped to 0. Executing emergency fleet resurrection.",
+                "confidence": 1.0,
+            }
+        return _safe_decision(
+            f"Rejected: active_replicas reads {replicas} — awaiting "
+            f"{EXTINCTION_CONFIRM_SECONDS}s confirmation before emergency scale_up "
+            f"({now - _extinction_since:.0f}s elapsed, may be a Prometheus SD gap)."
+        )
+    else:
+        _extinction_since = None
 
     # --- 1. Structural validation -----------------------------------
     if not isinstance(decision, dict):
@@ -99,9 +174,6 @@ def validate_decision(decision: dict, system_state: dict) -> dict:
         )
 
     # --- 3. Replica count guardrails -----------------------------------
-    # action_engine.py already protects against going below 1 or above 5,
-    # but we check here too so a bad decision never even reaches that code,
-    # and so the rejection reason is clear in logs/memory.
     active_replicas = system_state.get("active_replicas")
     if isinstance(active_replicas, (int, float)):
         if action == "scale_down" and active_replicas <= MIN_REPLICAS:
@@ -114,10 +186,19 @@ def validate_decision(decision: dict, system_state: dict) -> dict:
             )
 
     # --- 4. Metrics sanity check ----------------------------------------
-    # Cross-check the decision against the actual numbers so the LLM can't
-    # talk itself into an action the metrics don't support.
-    cpu = system_state.get("cpu_usage_percent")
-    error_rate = system_state.get("error_rate_percent")
+    if (
+        action == "scale_up"
+        and isinstance(memory, (int, float))
+        and isinstance(cpu, (int, float))
+        and isinstance(error_rate, (int, float))
+        and memory > HIGH_MEMORY_THRESHOLD
+        and cpu < HIGH_CPU_THRESHOLD
+        and error_rate < HIGH_ERROR_RATE_THRESHOLD
+    ):
+        return _safe_decision(
+            f"Rejected: scale_up requested but only memory is elevated ({memory}MB). "
+            f"Scaling adds replicas that will also leak — use restart_container instead."
+        )
 
     if action == "scale_up" and isinstance(cpu, (int, float)) and isinstance(error_rate, (int, float)):
         if cpu < HIGH_CPU_THRESHOLD and error_rate < HIGH_ERROR_RATE_THRESHOLD:
@@ -133,10 +214,28 @@ def validate_decision(decision: dict, system_state: dict) -> dict:
                 f"to justify removing a replica. Overriding LLM decision."
             )
 
-    # --- 5. Cooldown -----------------------------------------------------
-    # This runs last, after everything else has already approved the
-    # decision, so we only "spend" the cooldown window on actions that were
-    # otherwise valid. Rejected/no_action decisions never touch this timer.
+    # --- 5. Sustained-breach gate (CRON only — mirrors alert_rules.yml) --
+    # Webhook path: Alertmanager already enforced `for:` before calling us.
+    if source == "cron":
+        if action == "scale_up" and isinstance(cpu, (int, float)) and cpu >= CPU_ALERT_THRESHOLD:
+            if not _breach_sustained("cpu"):
+                elapsed = _breach_elapsed("cpu")
+                needed = BREACH_DURATIONS_SECONDS["cpu"]
+                return _safe_decision(
+                    f"Rejected: CPU at {cpu}% but breach not sustained for {needed}s yet "
+                    f"({elapsed:.0f}s elapsed — CRON must not beat Alertmanager's window)."
+                )
+
+        if action == "restart_container" and isinstance(error_rate, (int, float)) and error_rate >= HIGH_ERROR_RATE_THRESHOLD:
+            if not _breach_sustained("error_rate"):
+                elapsed = _breach_elapsed("error_rate")
+                needed = BREACH_DURATIONS_SECONDS["error_rate"]
+                return _safe_decision(
+                    f"Rejected: error_rate at {error_rate}% but breach not sustained for {needed}s yet "
+                    f"({elapsed:.0f}s elapsed)."
+                )
+
+    # --- 6. Cooldown -----------------------------------------------------
     global _last_action_time
     if action in ACTIONS_REQUIRING_COOLDOWN:
         now = time.time()
@@ -149,5 +248,4 @@ def validate_decision(decision: dict, system_state: dict) -> dict:
             )
         _last_action_time = now
 
-    # Passed every check; the original decision is allowed through unchanged.
     return decision

@@ -1,16 +1,18 @@
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from api.context_builder import ContextBuilder  
+from api.mutation_lock import mutation_guard
 from brain.llm_client import LLMClient
 from brain.safety_engine import validate_decision
 from executor.action_engine import ActionEngine
+from executor.memory import save_log
 
 router = APIRouter()
 context_builder = ContextBuilder()
 llm_client = LLMClient()
 action_engine = ActionEngine()
 
-# --- Pydantic Models for Rohan's Frontend Payload ---
+
 class ChatRequest(BaseModel):
     message: str
 
@@ -28,38 +30,52 @@ async def receive_alert(request: Request):
     payload = await request.json()
     print("\n" + "="*50)
     print("🚨 ALERT RECEIVED FROM ALERTMANAGER! 🚨")
-    print("🔍 Context Builder: Fetching current system metrics from Prometheus...")
-    system_state = await context_builder.get_system_state()
 
-    print("\n📊 CURRENT SYSTEM STATE:")
-    for metric, value in system_state.items():
-        print(f"   - {metric}: {value}")
+    with mutation_guard():
+        print("🔍 Context Builder: Fetching current system metrics from Prometheus...")
+        system_state = await context_builder.get_system_state()
 
-    print("\n🧠 Brain: Asking Groq for a decision...")
+        print("\n📊 CURRENT SYSTEM STATE:")
+        for metric, value in system_state.items():
+            print(f"   - {metric}: {value}")
 
-    raw_decision = await llm_client.get_decision(system_state)
+        print("\n🧠 Brain: Asking Groq for a decision...")
 
-    print(f"   - Raw LLM decision: {raw_decision}")
+        raw_decision = await llm_client.get_decision(system_state)
 
-    safe_decision = validate_decision(raw_decision, system_state)
-    
-    if safe_decision is not raw_decision:
-        print(f"   - ⚠️ Safety Engine overrode the decision: {safe_decision}")
-    else:
-        print(f"   - ✅ Safety Engine approved the decision.")
+        print(f"   - Raw LLM decision: {raw_decision}")
 
-
-    if safe_decision["action"] != "no_action":
-        print(f"\n⚡ Executor: Carrying out '{safe_decision['action']}'...")
-        action_engine.execute(safe_decision)
+        safe_decision = validate_decision(raw_decision, system_state, source="webhook")
         
-    print("="*50 + "\n")
-    return {
-        "status": "success",
-        "message": "Alert processed.",
-        "system_state": system_state,
-        "decision": safe_decision,
-    }
+        if safe_decision is not raw_decision:
+            print(f"   - ⚠️ Safety Engine overrode the decision: {safe_decision}")
+        else:
+            print(f"   - ✅ Safety Engine approved the decision.")
+
+        if safe_decision["action"] != "no_action":
+            print(f"\n⚡ Executor: Carrying out '{safe_decision['action']}'...")
+            action_engine.execute(safe_decision)
+            save_log(
+                incident="Alertmanager webhook alert",
+                reasoning=safe_decision.get("reason", ""),
+                action=safe_decision["action"],
+                status="executed",
+            )
+        else:
+            save_log(
+                incident="Alertmanager webhook alert",
+                reasoning=safe_decision.get("reason", ""),
+                action="no_action",
+                status="skipped",
+            )
+
+        print("="*50 + "\n")
+        return {
+            "status": "success",
+            "message": "Alert processed.",
+            "system_state": system_state,
+            "decision": safe_decision,
+        }
 
 
 @router.post("/chat")
@@ -74,8 +90,16 @@ async def copilot_chat(payload: ChatRequest):
     
     # Get Groq LLM diagnosis answering the developer
     raw_decision = await llm_client.get_decision(system_state)
-    safe_decision = validate_decision(raw_decision, system_state)
-    
+    safe_decision = validate_decision(raw_decision, system_state, source="chat")
+
+    # Log chat-driven decisions too so history stays complete
+    save_log(
+        incident=f"Chat inquiry: {payload.message[:120]}",
+        reasoning=safe_decision.get("reason", ""),
+        action=safe_decision["action"],
+        status="executed" if safe_decision["action"] != "no_action" else "skipped",
+    )
+
     return {
         "status": "success",
         "message": "Diagnosis complete.",
@@ -99,7 +123,14 @@ async def copilot_execute(payload: ExecuteRequest):
     # Execute immediately (action_engine.py already enforces min 1 / max 5 replicas)
     if payload.action != "no_action":
         action_engine.execute(human_decision)
-        
+
+    save_log(
+        incident="Manual override from Copilot UI",
+        reasoning=human_decision.get("reason", ""),
+        action=human_decision["action"],
+        status="executed" if payload.action != "no_action" else "skipped",
+    )
+
     # Harvest fresh telemetry POST-execution so Rohan's UI updates instantly!
     fresh_state = await context_builder.get_system_state()
 

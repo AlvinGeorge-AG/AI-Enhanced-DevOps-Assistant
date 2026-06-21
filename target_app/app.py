@@ -11,10 +11,9 @@ metrics = PrometheusMetrics(app)
 # A global list to hold junk data for our memory leak simulation
 memory_leak_storage = []
 
-# How long a single /chaos/cpu hit pins the CPU for. Kept generous so it
-# comfortably outlasts Prometheus's `for: 2m` alert window plus the 1m
-# rate() lookback that has to fill with high-CPU samples first.
-CPU_SPIKE_DURATION_SECONDS = 210  # 3.5 minutes
+# How long a single /chaos/cpu hit pins the CPU for. Must outlast the
+# alert's `for:` duration plus the rate() lookback (see alert_rules.yml).
+CPU_SPIKE_DURATION_SECONDS = 90
 
 # Thread count: oversubscribe relative to available cores so every core
 # has more than one runnable thread fighting for it at all times. Even
@@ -26,16 +25,13 @@ CPU_SPIKE_THREADS = max(4, _cpu_count * 2)
 
 
 def background_cpu_spike(end_time: float):
-    """Chunked busy-loop. Burns hot for ~4ms, then yields the GIL for 1ms 
-    so Flask's network thread can successfully answer Prometheus scrapes!"""
+    """Chunked busy-loop. Burns hot, then yields the GIL so Werkzeug can
+    answer Prometheus scrapes on :5000/metrics without timing out."""
     x = 0
     while time.time() < end_time:
-        # 50,000 raw integer loops takes roughly 4 milliseconds
-        for _ in range(50_000):
+        for _ in range(10_000):
             x = (x * 1234567 + 1) % 99999999
-            
-        # Explicitly open the GIL window for 1ms to serve /metrics
-        time.sleep(0.001)
+        time.sleep(0.002)
 
 @app.route('/')
 def hello():
@@ -50,7 +46,7 @@ def chaos_cpu():
         threading.Thread(target=background_cpu_spike, args=(end_time,), daemon=True).start()
     return (
         f"Chaos injected: CPU spike started across {CPU_SPIKE_THREADS} threads "
-        f"for {CPU_SPIKE_DURATION_SECONDS}s (no sleep gaps)."
+        f"for {CPU_SPIKE_DURATION_SECONDS}s (GIL-yielding loop)."
     )
 
 @app.route('/chaos/memory')
