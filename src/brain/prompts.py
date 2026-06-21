@@ -42,7 +42,7 @@ CRITICAL SRE RULES & GUARDRAILS:
      → You MUST output "restart_container". This is the ONLY way to reclaim leaked memory.
      → NEVER output "no_action" for this pattern. A memory leak does NOT fix itself.
      → NEVER output "scale_up" for this pattern. Adding replicas gives the leak MORE memory to consume.
-   - High RAM (>150 MB) + high CPU (>80%) + high request rate → scale_up (genuine load-induced memory growth).
+   - High RAM (>150 MB) + high CPU (>80%) ( + optionally  high request rate) → scale_up (genuine load-induced memory growth).
    - If active_alerts > 0, an alert is actively firing. This means something is WRONG. Do NOT output "no_action" unless cooldown prevents action.
 
 4. SCALE-DOWN MANDATE (COST EFFICIENCY):
@@ -86,13 +86,27 @@ def build_incident_prompt(system_state: dict) -> str:
     if isinstance(memory, (int, float)) and memory > 150:
         if isinstance(cpu, (int, float)) and cpu < 20:
             diagnostic_hint = (
-                "\n⚠️ DIAGNOSTIC FLAG: Memory is critically elevated at "
+                "\nDIAGNOSTIC FLAG: Memory is critically elevated at "
                 f"{memory}MB while CPU is only {cpu}% and request_rate is {request_rate}/s. "
                 "This is the classic MEMORY LEAK fingerprint — the process is hoarding RAM "
                 "without doing proportional work. The ONLY remediation is restart_container "
                 "to reclaim the leaked memory. scale_up would be WRONG (new replicas will "
                 "also leak). no_action would be WRONG (leaks never self-heal).\n"
             )
+
+    # If the webhook injected alert context, include it prominently so the
+    # LLM knows Alertmanager already confirmed a sustained breach — even if
+    # current metrics have recovered by the time we fetch them.
+    alert_ctx = system_state.get("alert_context", "")
+    alert_block = ""
+    if alert_ctx:
+        alert_block = (
+            f"\nCRITICAL ALERT CONTEXT: {alert_ctx}\n"
+            "You MUST factor this alert into your decision. Alertmanager already "
+            "waited its full sustained-breach window before sending this — the "
+            "breach was real even if current metrics look normal now. Prefer action "
+            "over no_action when an alert is actively firing.\n"
+        )
 
     # Check if this is a chat request from the React UI
     user_msg = system_state.get("user_chat_message")
@@ -106,7 +120,7 @@ def build_incident_prompt(system_state: dict) -> str:
                   - Request rate: {request_rate} req/s
                   - Active replicas: {replicas}
                   - Active alerts firing: {active_alerts}
-                  {history_text}{diagnostic_hint}
+                  {history_text}{diagnostic_hint}{alert_block}
                   The developer asks: "{user_msg}"
 
                   You are an expert SRE. Answer the developer's question directly inside the 'reason' field using plain, 
@@ -123,6 +137,6 @@ def build_incident_prompt(system_state: dict) -> str:
                   - Request rate: {request_rate} req/s
                   - Active replicas: {replicas}
                   - Active alerts firing: {active_alerts}
-                  {history_text}{diagnostic_hint}
+                  {history_text}{diagnostic_hint}{alert_block}
                   Analyze the metrics AND your recent actions. FOLLOW YOUR SYSTEM INSTRUCTIONS!. 
                   What action should be taken? Respond with ONLY the JSON object described in your instructions."""

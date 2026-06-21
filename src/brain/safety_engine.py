@@ -6,6 +6,7 @@
 # and impossible for a bad model output to talk its way around.
 
 import time
+from api.log_formatter import log_emergency_override
 
 VALID_ACTIONS = {"scale_up", "scale_down", "restart_container", "no_action"}
 
@@ -133,10 +134,11 @@ def validate_decision(decision: dict, system_state: dict, *, source: str = "cron
         if _extinction_since is None:
             _extinction_since = now
         if now - _extinction_since >= EXTINCTION_CONFIRM_SECONDS:
-            print("\n" + "⚠️"*25)
-            print("🚨 HARD GUARDRAIL INTERCEPTION: TOTAL FLEET EXTINCTION DETECTED! 🚨")
-            print("Bypassing LLM logic. Forcing immediate emergency cold-boot...")
-            print("⚠️"*25 + "\n")
+            log_emergency_override(
+                "TOTAL FLEET EXTINCTION DETECTED!\n"
+                "Active container count dropped to 0.\n"
+                "Bypassing LLM logic. Forcing immediate emergency cold-boot."
+            )
             _extinction_since = None
             return {
                 "action": "scale_up",
@@ -230,14 +232,14 @@ def validate_decision(decision: dict, system_state: dict, *, source: str = "cron
         and cpu < LOW_CPU_THRESHOLD
         and error_rate < HIGH_ERROR_RATE_THRESHOLD
     ):
-        print("\n" + "🧠"*25)
-        print("🚨 HARD GUARDRAIL: MEMORY LEAK DETECTED! 🚨")
-        print(f"   Memory: {memory}MB (>{HIGH_MEMORY_THRESHOLD}MB threshold)")
-        print(f"   CPU: {cpu}% (low — not genuine load)")
-        print(f"   Errors: {error_rate}% (low — not state corruption)")
-        print(f"   LLM said '{action}' but this is WRONG for a memory leak.")
-        print("   Overriding to restart_container to reclaim leaked memory.")
-        print("🧠"*25 + "\n")
+        log_emergency_override(
+            f"MEMORY LEAK DETECTED!\n"
+            f"Memory: {memory:.2f}MB (>{HIGH_MEMORY_THRESHOLD}MB threshold)\n"
+            f"CPU: {cpu:.2f}% (low -- not genuine load)\n"
+            f"Errors: {error_rate:.2f}% (low -- not state corruption)\n"
+            f"LLM said '{action}' but this is WRONG for a memory leak.\n"
+            f"Overriding to restart_container to reclaim leaked memory."
+        )
 
         # This is a forced action, so we need to check cooldown before forcing
         now = time.time()

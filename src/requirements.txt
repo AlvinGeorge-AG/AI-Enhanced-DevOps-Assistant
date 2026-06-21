@@ -5,3 +5,4 @@ docker==7.1.0
 APScheduler==3.10.4
 groq==1.4.0
 python-dotenv==1.0.1
+rich>=13.0.0

@@ -4,6 +4,7 @@ import json
 from groq import AsyncGroq
 
 from brain.prompts import SYSTEM_PROMPT, build_incident_prompt
+from api.log_formatter import console
 
 # Centralizing the model name here (instead of inline in the call) makes it
 # a one-line change if we ever want to swap models.
@@ -26,7 +27,7 @@ class LLMClient:
             # We don't raise here because we still want the rest of the app
             # (and local dev without a key yet) to import and start up.
             # The actual API call below will fail loudly instead.
-            print("⚠️ LLMClient: GROQ_API_KEY is not set. Calls will fail.")
+            console.print("  LLMClient: GROQ_API_KEY is not set. Calls will fail.", style="bold red")
         self.client = AsyncGroq(api_key=api_key)
 
     async def get_decision(self, system_state: dict) -> dict:
@@ -54,11 +55,11 @@ class LLMClient:
             return decision
 
         except json.JSONDecodeError as e:
-            print(f"⚠️ LLMClient: Could not parse LLM response as JSON: {e}")
+            console.print(f"  LLMClient: Could not parse LLM response as JSON: {e}", style="bold yellow")
             return FALLBACK_DECISION
         except Exception as e:
             # Catches Groq SDK errors (auth, rate limit, connection, etc.)
             # as well as anything unexpected. We'd rather log and fall back
             # than let an incident response pipeline crash.
-            print(f"⚠️ LLMClient: Groq API call failed: {e}")
+            console.print(f"  LLMClient: Groq API call failed: {e}", style="bold yellow")
             return FALLBACK_DECISION
