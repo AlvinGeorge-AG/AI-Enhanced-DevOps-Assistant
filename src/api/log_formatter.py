@@ -131,7 +131,7 @@ def log_system_state(state: dict, title: str = "SYSTEM STATE") -> None:
     # Print recent history below the table instead of dumping raw JSON
     history = state.get("recent_history")
     if history and isinstance(history, list):
-        console.print("  [bold white]Recent Infrastructure History:[/bold white]")
+        console.print("  [bold white]Recent Infrastructure History:[/bold white]\n")
         for item in history:
             time = item.get("time", "")
             action = item.get("action", "")
@@ -142,9 +142,8 @@ def log_system_state(state: dict, title: str = "SYSTEM STATE") -> None:
             status_color = "bold green" if status == "executed" else "dim"
             action_color = "bold cyan" if action != "no_action" else "dim"
             
-            console.print(f"    • [{time}] [{action_color}]{action}[/{action_color}] ([{status_color}]{status}[/{status_color}])")
-            console.print(f"      [dim]{reason}[/dim]")
-        console.print()
+            console.print(f"    [white]•[/white] [{time}] [{action_color}]{action}[/{action_color}] ([{status_color}]{status}[/{status_color}])")
+            console.print(f"      [dim]↳ {reason}[/dim]\n")
 
 
 def log_decision(decision: dict, source: str) -> None:
