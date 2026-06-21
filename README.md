@@ -1,6 +1,6 @@
-# 🤖 AI-Assisted DevOps Engine & Auto-SRE Copilot
+# 🤖 AI-Assisted DevOps Assistant
 
-![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-00a67d?style=flat&logo=fastapi) ![Flask](https://img.shields.io/badge/Target_Fleet-Flask-000000?style=flat&logo=flask) ![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker) ![Prometheus](https://img.shields.io/badge/Prometheus-Telemetry-E6522C?style=flat&logo=prometheus) ![Groq](https://img.shields.io/badge/LLM-Groq_Cloud-f55036?style=flat) ![SQLite](https://img.shields.io/badge/Audit_Store-SQLite3-003B57?style=flat&logo=sqlite)![AlertManager](https://img.shields.io/badge/alertmanager-Telemetry-E6522C?style=flat&logo=alertmanager)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-00a67d?style=flat&logo=fastapi) ![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker) ![Prometheus](https://img.shields.io/badge/Prometheus-Telemetry-E6522C?style=flat&logo=prometheus) ![Groq](https://img.shields.io/badge/LLM-Groq_Cloud-f55036?style=flat) ![SQLite](https://img.shields.io/badge/Audit_Store-SQLite3-003B57?style=flat&logo=sqlite)![AlertManager](https://img.shields.io/badge/alertmanager-Telemetry-E6522C?style=flat&logo=alertmanager)
 
 An autonomous, closed-loop Site Reliability Engineering (SRE) platform. The system continuously ingests container telemetry, evaluates cluster health via a large language model, passes decisions through a deterministic Python safety guardrail, and executes zero-downtime infrastructure mutations (auto-scaling and auto-healing) directly against the local Docker Engine daemon.
 
@@ -9,7 +9,7 @@ An autonomous, closed-loop Site Reliability Engineering (SRE) platform. The syst
 ## System Architecture
 
 ```text
-Target Fleet : Flask ('DPC' dynamically scaled Compose replicas, port 5000)
+Target App   : Flask ('app' dynamically scaled Compose replicas, port 5000)
 Telemetry    : Prometheus (docker_sd_configs) ➔ Alertmanager (port 9093)
 Edge Proxy   : Nginx Alpine (Dynamic upstream mapping, zero-downtime reloads)
 Framework    : FastAPI / Python 3.11 (Async Uvicorn engine, port 8000)
