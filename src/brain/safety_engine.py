@@ -57,6 +57,23 @@ def validate_decision(decision: dict, system_state: dict) -> dict:
     treated as a failed check, not a crash.
     """
 
+    replicas = float(system_state.get("active_replicas", 1.0))
+
+    # =========================================================================
+    # RULE 0: THE DEFIBRILLATOR (TOTAL EXTINCTION OVERRIDE)
+    # =========================================================================
+    if replicas < 1.0:
+        print("\n" + "⚠️"*25)
+        print("🚨 HARD GUARDRAIL INTERCEPTION: TOTAL FLEET EXTINCTION DETECTED! 🚨")
+        print("Bypassing LLM logic. Forcing immediate emergency cold-boot...")
+        print("⚠️"*25 + "\n")
+        
+        return {
+            "action": "scale_up",
+            "reason": "SAFETY OVERRIDE: Active container count dropped to 0. Executing emergency fleet resurrection.",
+            "confidence": 1.0
+        }
+
     # --- 1. Structural validation -----------------------------------
     if not isinstance(decision, dict):
         return _safe_decision("Rejected: decision was not a JSON object.")
