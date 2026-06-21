@@ -113,6 +113,8 @@ def validate_decision(decision: dict, system_state: dict, *, source: str = "cron
     treated as a failed check, not a crash.
     """
 
+    global _last_action_time
+
     _update_breach_timers(system_state)
 
     cpu = system_state.get("cpu_usage_percent")
@@ -214,6 +216,59 @@ def validate_decision(decision: dict, system_state: dict, *, source: str = "cron
                 f"to justify removing a replica. Overriding LLM decision."
             )
 
+    # --- 4b. MEMORY LEAK HARD OVERRIDE (LAST LINE OF DEFENSE) -----------
+    # If the LLM says "no_action" or "scale_up" but memory is dangerously
+    # high with low CPU and low errors, this is a textbook memory leak.
+    # The safety engine FORCES restart_container deterministically —
+    # just like the extinction detector forces scale_up at 0 replicas.
+    if (
+        action in ("no_action", "scale_up")
+        and isinstance(memory, (int, float))
+        and isinstance(cpu, (int, float))
+        and isinstance(error_rate, (int, float))
+        and memory > HIGH_MEMORY_THRESHOLD
+        and cpu < LOW_CPU_THRESHOLD
+        and error_rate < HIGH_ERROR_RATE_THRESHOLD
+    ):
+        print("\n" + "🧠"*25)
+        print("🚨 HARD GUARDRAIL: MEMORY LEAK DETECTED! 🚨")
+        print(f"   Memory: {memory}MB (>{HIGH_MEMORY_THRESHOLD}MB threshold)")
+        print(f"   CPU: {cpu}% (low — not genuine load)")
+        print(f"   Errors: {error_rate}% (low — not state corruption)")
+        print(f"   LLM said '{action}' but this is WRONG for a memory leak.")
+        print("   Overriding to restart_container to reclaim leaked memory.")
+        print("🧠"*25 + "\n")
+
+        # This is a forced action, so we need to check cooldown before forcing
+        now = time.time()
+        seconds_since_last = now - _last_action_time
+        if seconds_since_last < COOLDOWN_SECONDS:
+            return _safe_decision(
+                f"Memory leak detected (mem={memory}MB, cpu={cpu}%) but cooldown active. "
+                f"Last infrastructure change was {seconds_since_last:.0f}s ago; "
+                f"must wait {COOLDOWN_SECONDS}s between actions."
+            )
+
+        # For cron source, require the memory breach to be sustained
+        if source == "cron" and not _breach_sustained("memory"):
+            elapsed = _breach_elapsed("memory")
+            needed = BREACH_DURATIONS_SECONDS["memory"]
+            return _safe_decision(
+                f"Memory leak detected (mem={memory}MB) but breach not sustained for {needed}s yet "
+                f"({elapsed:.0f}s elapsed). Waiting for confirmation before forced restart."
+            )
+
+        _last_action_time = now
+        return {
+            "action": "restart_container",
+            "reason": (
+                f"SAFETY OVERRIDE: Memory leak detected — memory at {memory}MB with only "
+                f"{cpu}% CPU and {error_rate}% errors. The process is hoarding RAM without "
+                f"doing useful work. Forcing restart_container to reclaim leaked memory."
+            ),
+            "confidence": 1.0,
+        }
+
     # --- 5. Sustained-breach gate (CRON only — mirrors alert_rules.yml) --
     # Webhook path: Alertmanager already enforced `for:` before calling us.
     if source == "cron":
@@ -236,7 +291,6 @@ def validate_decision(decision: dict, system_state: dict, *, source: str = "cron
                 )
 
     # --- 6. Cooldown -----------------------------------------------------
-    global _last_action_time
     if action in ACTIONS_REQUIRING_COOLDOWN:
         now = time.time()
         seconds_since_last = now - _last_action_time
