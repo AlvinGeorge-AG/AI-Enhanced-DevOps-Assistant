@@ -9,3 +9,5 @@ __pycache__/
 # SQLite local databases
 *.db
 *.sqlite3
+
+nginx.conf

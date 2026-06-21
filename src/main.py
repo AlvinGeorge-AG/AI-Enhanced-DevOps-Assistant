@@ -1,4 +1,3 @@
-# The entry point that starts the API and Cron scheduler
 from fastapi import FastAPI
 from api.routes import router
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -19,39 +18,31 @@ action_engine = ActionEngine()
 
 def scheduled_health_check():
     print("\n⏰ CRON: Running routine system health check...")
-    
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     state = loop.run_until_complete(context_builder.get_system_state())
     
-    print(f"📊 ROUTINE STATE: {state}\n")
+    # =========================================================================
+    # THE CONCURRENCY YIELD RULE
+    # =========================================================================
+    if state.get("active_alerts", 0.0) > 0:
+        print("⏳ CRON: Alertmanager is actively cooking/firing a trauma alert. Yielding floor to prevent race condition.\n")
+        return
 
+    print(f"📊 ROUTINE STATE: {state}\n")
     raw_decision = loop.run_until_complete(llm_client.get_decision(state))
     safe_decision = validate_decision(raw_decision, state)
 
-    if safe_decision is not raw_decision:
-        print(f"⚠️ CRON: Safety Engine overrode the decision: {safe_decision}")
-
     if safe_decision["action"] != "no_action":
         print(f"⚡ CRON: Executing '{safe_decision['action']}'...")
-        try:
-            action_engine.execute(safe_decision)
-            # Log the successful infrastructure change!
-            process_decision(safe_decision, state, status="SUCCESS")
-        except Exception as e:
-            # If Docker fails, record the exact error in the DB
-            process_decision(safe_decision, state, status=f"FAILED: {str(e)}")
+        action_engine.execute(safe_decision)
     else:
         print(f"✅ CRON: No action needed. ({safe_decision['reason']})")
-        # Log routine healthy states so the Copilot Chat knows the app was stable here
-        process_decision(safe_decision, state, status="ROUTINE_CHECK_STABLE")
 
 
 @app.on_event("startup")
-def startup_events():
-    print("📦 Initializing SQLite Memory Database...")
-    init_db()  # <--- Balamurali's table gets built here!
-    
+def start_scheduler():
+    init_db()
     scheduler = BackgroundScheduler()
     scheduler.add_job(scheduled_health_check, 'interval', minutes=3)
     scheduler.start()

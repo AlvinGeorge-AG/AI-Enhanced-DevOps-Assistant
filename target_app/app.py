@@ -26,14 +26,16 @@ CPU_SPIKE_THREADS = max(4, _cpu_count * 2)
 
 
 def background_cpu_spike(end_time: float):
-    """Tight, sleep-free busy loop. No factorial-then-sleep pattern --
-    that left gaps where CPU dropped to ~0%, which is exactly what was
-    diluting the rate(process_cpu_seconds_total[1m]) average below the
-    80% alert threshold. Plain arithmetic in a hot loop is enough; the
-    point is zero idle gaps, not a "heavy" operation."""
+    """Chunked busy-loop. Burns hot for ~4ms, then yields the GIL for 1ms 
+    so Flask's network thread can successfully answer Prometheus scrapes!"""
     x = 0
     while time.time() < end_time:
-        x = (x * 1234567 + 1) % 99999999
+        # 50,000 raw integer loops takes roughly 4 milliseconds
+        for _ in range(50_000):
+            x = (x * 1234567 + 1) % 99999999
+            
+        # Explicitly open the GIL window for 1ms to serve /metrics
+        time.sleep(0.001)
 
 @app.route('/')
 def hello():
