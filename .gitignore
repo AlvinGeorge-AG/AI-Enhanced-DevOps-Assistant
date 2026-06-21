@@ -10,4 +10,6 @@ __pycache__/
 *.db
 *.sqlite3
 
-*.conf
+# Generated nginx.conf (action_engine rewrites this during scaling)
+# The template infra/nginx/nginx.conf.default is tracked by git
+infra/nginx/nginx.conf
