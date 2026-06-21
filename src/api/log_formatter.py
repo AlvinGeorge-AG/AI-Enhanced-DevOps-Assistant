@@ -28,7 +28,7 @@ HIGH_ERROR_RATE_THRESHOLD = 5.0
 HIGH_MEMORY_THRESHOLD = 150.0
 
 
-console = Console()
+console = Console(force_terminal=True, color_system="standard")
 
 
 # ---------------------------------------------------------------------------
@@ -127,6 +127,24 @@ def log_system_state(state: dict, title: str = "SYSTEM STATE") -> None:
     console.print()
     console.print(table)
     console.print()
+
+    # Print recent history below the table instead of dumping raw JSON
+    history = state.get("recent_history")
+    if history and isinstance(history, list):
+        console.print("  [bold white]Recent Infrastructure History:[/bold white]")
+        for item in history:
+            time = item.get("time", "")
+            action = item.get("action", "")
+            status = item.get("status", "")
+            reason = item.get("reason", "")
+            
+            # Highlight executed actions differently from skipped ones
+            status_color = "bold green" if status == "executed" else "dim"
+            action_color = "bold cyan" if action != "no_action" else "dim"
+            
+            console.print(f"    • [{time}] [{action_color}]{action}[/{action_color}] ([{status_color}]{status}[/{status_color}])")
+            console.print(f"      [dim]{reason}[/dim]")
+        console.print()
 
 
 def log_decision(decision: dict, source: str) -> None:
