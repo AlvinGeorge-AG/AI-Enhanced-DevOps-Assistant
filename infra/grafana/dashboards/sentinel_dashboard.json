@@ -1,0 +1,377 @@
+{
+    "annotations": {
+        "list": [
+            {
+                "builtIn": 1,
+                "datasource": {
+                    "type": "grafana",
+                    "uid": "-- Grafana --"
+                },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "type": "dashboard"
+            }
+        ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": null,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+        {
+            "type": "stat",
+            "title": "Active Replicas",
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 0
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "count(process_cpu_seconds_total)",
+                    "refId": "A"
+                }
+            ],
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto"
+            }
+        },
+        {
+            "type": "stat",
+            "title": "Current Error Rate (%)",
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 0
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "(sum(rate(flask_http_request_duration_seconds_count{status=~\"5..\"}[1m])) / sum(rate(flask_http_request_duration_seconds_count[1m])) * 100) or vector(0)",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto"
+            }
+        },
+        {
+            "type": "stat",
+            "title": "Current Request Rate (req/s)",
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 0
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "sum(rate(flask_http_request_duration_seconds_count[1m]))",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "reqps"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto"
+            }
+        },
+        {
+            "type": "stat",
+            "title": "Current Memory Usage (MB)",
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 0
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "sum(process_resident_memory_bytes) / 1024 / 1024",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "decbytes"
+                },
+                "overrides": []
+            },
+            "options": {
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "orientation": "auto",
+                "textMode": "auto",
+                "colorMode": "value",
+                "graphMode": "none",
+                "justifyMode": "auto"
+            }
+        },
+        {
+            "type": "timeseries",
+            "title": "CPU Usage per Replica (%)",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 4
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "avg by(instance) (rate(process_cpu_seconds_total[15s]) * 100)",
+                    "legendFormat": "{{instance}}",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent"
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            }
+        },
+        {
+            "type": "timeseries",
+            "title": "Memory Usage per Replica (MB)",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 4
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "process_resident_memory_bytes / 1024 / 1024",
+                    "legendFormat": "{{instance}}",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "decmbytes"
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            }
+        },
+        {
+            "type": "timeseries",
+            "title": "Request Rate (req/s)",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 12
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "sum(rate(flask_http_request_duration_seconds_count[1m]))",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "reqps"
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            }
+        },
+        {
+            "type": "timeseries",
+            "title": "Error Rate (%)",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 12
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "(sum(rate(flask_http_request_duration_seconds_count{status=~\"5..\"}[1m])) / sum(rate(flask_http_request_duration_seconds_count[1m])) * 100) or vector(0)",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent"
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            }
+        },
+        {
+            "type": "timeseries",
+            "title": "Replica Count Over Time",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 20
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "count(process_cpu_seconds_total)",
+                    "refId": "A"
+                }
+            ],
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            }
+        },
+        {
+            "type": "timeseries",
+            "title": "Average CPU Across Fleet (%)",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 20
+            },
+            "datasource": "Prometheus",
+            "targets": [
+                {
+                    "expr": "avg(rate(process_cpu_seconds_total[15s]) * 100)",
+                    "refId": "A"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent"
+                },
+                "overrides": []
+            },
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom"
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            }
+        }
+    ],
+    "refresh": "3s",
+    "schemaVersion": 39,
+    "style": "dark",
+    "tags": [
+        "sentinel",
+        "devops",
+        "ai"
+    ],
+    "templating": {
+        "list": []
+    },
+    "time": {
+        "from": "now-15m",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "AI-Enhanced DevOps Assistant Dashboard",
+    "uid": "sentinel-dashboard",
+    "version": 1,
+    "weekStart": ""
+}
