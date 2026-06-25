@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Body
 from pydantic import BaseModel
 from api.context_builder import ContextBuilder  
 from api.mutation_lock import mutation_guard
@@ -36,9 +36,7 @@ def startup():
     return "THE CORE API SERVER RUNNING SUCCESSFULLY!"
 
 @router.post("/webhook")
-async def receive_alert(request: Request):
-    payload = await request.json()
-
+def receive_alert(payload: dict = Body(...)):
     # ── Extract alert context from the Alertmanager payload ──────────
     # Alertmanager sends an array of alerts, each with:
     #   status: "firing" | "resolved"
@@ -68,9 +66,13 @@ async def receive_alert(request: Request):
     log_alert_received("ALERTMANAGER")
     console.print(f"  Firing alerts: [bold yellow]{', '.join(alert_names)}[/bold yellow]")
 
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
     with mutation_guard():
         log_info("Fetching current system metrics from Prometheus...", style="dim italic")
-        system_state = await context_builder.get_system_state()
+        system_state = loop.run_until_complete(context_builder.get_system_state())
 
         # ── Inject alert context so the LLM knows WHY this webhook fired ──
         # Even if metrics have recovered by now, the LLM needs to know that
@@ -87,7 +89,7 @@ async def receive_alert(request: Request):
 
         log_info("Requesting LLM decision from Groq...", style="dim italic")
 
-        raw_decision = await llm_client.get_decision(system_state)
+        raw_decision = loop.run_until_complete(llm_client.get_decision(system_state))
 
         log_decision(raw_decision, source="WEBHOOK")
 
@@ -160,7 +162,7 @@ async def copilot_chat(payload: ChatRequest):
 
 
 @router.post("/execute")
-async def copilot_execute(payload: ExecuteRequest):
+def copilot_execute(payload: ExecuteRequest):
     console.print(
         f"\n  COPILOT MANUAL COMMAND: '{payload.action}' ({payload.description})",
         style="bold cyan",
@@ -175,7 +177,8 @@ async def copilot_execute(payload: ExecuteRequest):
     
     # Execute immediately (action_engine.py already enforces min 1 / max 5 replicas)
     if payload.action != "no_action":
-        action_engine.execute(human_decision)
+        with mutation_guard():
+            action_engine.execute(human_decision)
 
     save_log(
         incident="Manual override from Copilot UI",
@@ -184,8 +187,11 @@ async def copilot_execute(payload: ExecuteRequest):
         status="executed" if payload.action != "no_action" else "skipped",
     )
 
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     # Harvest fresh telemetry POST-execution so Rohan's UI updates instantly!
-    fresh_state = await context_builder.get_system_state()
+    fresh_state = loop.run_until_complete(context_builder.get_system_state())
 
     return {
         "status": "success",

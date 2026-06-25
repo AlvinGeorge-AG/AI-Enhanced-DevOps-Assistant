@@ -1,6 +1,9 @@
 # Holds the threshold rules and webhook target
 route:
   receiver: 'sentinel_webhook'
+  group_wait: 1s
+  group_interval: 10s
+  repeat_interval: 1m
 
 receivers:
   - name: 'sentinel_webhook'

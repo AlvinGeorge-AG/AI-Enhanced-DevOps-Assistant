@@ -1,6 +1,6 @@
-# Tells Prometheus what to scrape
 global:
   scrape_interval: 5s
+  evaluation_interval: 5s
 
 rule_files:
   - 'alert_rules.yml'
