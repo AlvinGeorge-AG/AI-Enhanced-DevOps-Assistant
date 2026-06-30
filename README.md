@@ -22,7 +22,6 @@
 
 <br/>
 
-[Architecture](#-system-architecture) · [How It Works](#-the-autonomous-sre-pipeline) · [Safety Engine](#-the-deterministic-safety-engine) · [Setup](#-local-setup) · [Chaos Tests](#-chaos-engineering-suite) · [API](#-api-endpoints) · [Project Structure](#-project-structure)
 
 </div>
 
@@ -58,7 +57,7 @@ Problem Detected → AI Diagnoses Root Cause → Safety Engine Validates → Inf
 │  │  App x N  │   │  (LB:80)     │   │  (:9090)   │   │   (:3000)    │   │
 │  │  (:5000)  │──►│              │   │            │   │              │   │
 │  └────┬──────┘   └──────────────┘   └─────┬──────┘   └──────────────┘   │
-│       │ /metrics                   scrapes │every 5s                    │
+│       │ /metrics                   scrapes│every 5s                    │
 │       │◄──────────────────────────────────┘                             │
 │       │                            fires if                             │
 │       │                          breach sustained                       │
