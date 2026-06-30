@@ -1,6 +1,4 @@
-<![CDATA[<div align="center">
-
-# 🧠 AI-Enhanced DevOps Assistant
+#  AI-Enhanced DevOps Assistant
 
 ### _Autonomous, Closed-Loop Site Reliability Engineering with LLM-Driven Decision Making_
 
@@ -30,7 +28,7 @@
 
 ---
 
-## 📌 What This Project Does
+##  What This Project Does
 
 Traditional DevOps monitoring tools **detect** problems and send alerts to humans. This project goes further — it **detects, diagnoses, decides, and acts** autonomously, in a closed feedback loop:
 
@@ -48,37 +46,37 @@ Problem Detected → AI Diagnoses Root Cause → Safety Engine Validates → Inf
 
 ---
 
-## 🏗 System Architecture
+##  System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                        DOCKER COMPOSE STACK                            │
-│                                                                        │
-│  ┌──────────┐   ┌──────────────┐   ┌────────────┐   ┌──────────────┐  │
-│  │  Target   │   │              │   │            │   │   Grafana    │  │
-│  │  Flask    │◄──│    Nginx     │   │ Prometheus │   │  Dashboard   │  │
-│  │  App x N  │   │  (LB:80)    │   │  (:9090)   │   │   (:3000)   │  │
-│  │  (:5000)  │──►│              │   │            │   │              │  │
-│  └────┬──────┘   └──────────────┘   └─────┬──────┘   └──────────────┘  │
+│                        DOCKER COMPOSE STACK                             │
+│                                                                         │
+│  ┌───────────┐   ┌──────────────┐   ┌────────────┐   ┌──────────────┐   │
+│  │  Target   │   │              │   │            │   │   Grafana    │   │
+│  │  Flask    │◄──│    Nginx     │   │ Prometheus │   │  Dashboard   │   │
+│  │  App x N  │   │  (LB:80)     │   │  (:9090)   │   │   (:3000)    │   │
+│  │  (:5000)  │──►│              │   │            │   │              │   │
+│  └────┬──────┘   └──────────────┘   └─────┬──────┘   └──────────────┘   │
 │       │ /metrics                   scrapes │every 5s                    │
-│       │◄──────────────────────────────────┘                            │
-│       │                            fires if                            │
-│       │                          breach sustained                      │
-│       │                       ┌──────────────┐                         │
-│       │                       │ Alertmanager │                         │
-│       │                       │   (:9093)    │                         │
-│       │                       └──────┬───────┘                         │
-│       │                              │ POST /webhook                   │
-│       │         ┌────────────────────▼──────────────────────┐          │
+│       │◄──────────────────────────────────┘                             │
+│       │                            fires if                             │
+│       │                          breach sustained                       │
+│       │                       ┌──────────────┐                          │
+│       │                       │ Alertmanager │                          │
+│       │                       │   (:9093)    │                          │
+│       │                       └──────┬───────┘                          │
+│       │                              │ POST /webhook                    │
+│       │         ┌────────────────────▼───────────────────────┐          │
 │       │         │          SENTINEL API (:8000)              │          │
 │       │         │  ┌──────────────────────────────────────┐  │          │
-│       │         │  │ Context     │ LLM Client │ Safety   │  │          │
-│       │         │  │ Builder     │ (Groq API) │ Engine   │  │          │
-│       │         │  │ (PromQL)    │ Llama 3.3  │ (Rules)  │  │          │
+│       │         │  │ Context     │ LLM Client │ Safety    │  │          │
+│       │         │  │ Builder     │ (Groq API) │ Engine    │  │          │
+│       │         │  │ (PromQL)    │ Llama 3.3  │ (Rules)   │  │          │
 │       │         │  └──────────────────────────────────────┘  │          │
 │       │         │  ┌──────────────────────────────────────┐  │          │
-│       │         │  │ Action Engine │ Memory  │ Scheduler │  │          │
-│       │         │  │ (Docker SDK)  │(SQLite) │  (CRON)   │  │          │
+│       │         │  │ Action Engine │ Memory  │ Scheduler  │  │          │
+│       │         │  │ (Docker SDK)  │(SQLite) │  (CRON)    │  │          │
 │       │         │  └──────────────────────────────────────┘  │          │
 │       │◄────────│  docker.sock + compose scale + nginx write │          │
 │                 └────────────────────────────────────────────┘          │
@@ -99,7 +97,7 @@ Problem Detected → AI Diagnoses Root Cause → Safety Engine Validates → Inf
 
 ---
 
-## 🔄 The Autonomous SRE Pipeline
+##  The Autonomous SRE Pipeline
 
 Every decision — whether triggered by a CRON tick or an Alertmanager webhook — flows through the same 7-stage pipeline:
 
@@ -152,7 +150,7 @@ STAGE 7 ─── Audit Commit (memory.py)
 
 ---
 
-## 🛡 The Deterministic Safety Engine
+##  The Deterministic Safety Engine
 
 > The LLM proposes. The Safety Engine disposes.
 
@@ -176,15 +174,15 @@ Every decision passes through these 6 rules **sequentially**. The first rule tha
 
 LLMs are probabilistic — they can hallucinate, contradict themselves, or make overconfident bad calls. The Safety Engine ensures:
 
-- ✅ **No runaway scaling** (bounded 1–5 replicas)
-- ✅ **No action spam** (120s cooldown between mutations)
-- ✅ **No false positives** (sustained-breach gates mirror Prometheus alert rules)
-- ✅ **No missed emergencies** (Rule 0 bypasses everything when fleet is dead)
-- ✅ **LLM-proof memory leak detection** (hard override even if LLM says "no_action")
+-  **No runaway scaling** (bounded 1–5 replicas)
+-  **No action spam** (120s cooldown between mutations)
+-  **No false positives** (sustained-breach gates mirror Prometheus alert rules)
+-  **No missed emergencies** (Rule 0 bypasses everything when fleet is dead)
+-  **LLM-proof memory leak detection** (hard override even if LLM says "no_action")
 
 ---
 
-## 🧪 Chaos Engineering Suite
+##  Chaos Engineering Suite
 
 The repository includes purpose-built stress tests that simulate real production failures and trigger the autonomous pipeline end-to-end.
 
@@ -262,7 +260,7 @@ Fires CPU + Memory + Error chaos simultaneously to test the pipeline under compo
 
 ---
 
-## 🚀 Local Setup
+##  Local Setup
 
 ### Prerequisites
 
@@ -318,7 +316,7 @@ python3 tests/cpu_test.py
 
 ---
 
-## 🌐 API Endpoints
+##  API Endpoints
 
 | Method | Endpoint | Trigger | Description |
 |---|---|---|---|
@@ -329,7 +327,7 @@ python3 tests/cpu_test.py
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 AI-Enhanced-DevOps-Assistant/
@@ -387,7 +385,7 @@ AI-Enhanced-DevOps-Assistant/
 
 ---
 
-## 🔑 Key Design Decisions
+##  Key Design Decisions
 
 ### Why a Safety Engine instead of just trusting the LLM?
 
@@ -415,7 +413,7 @@ Groq's inference speed (~200 tokens/s) ensures the decision pipeline completes i
 
 ---
 
-## 📊 Inspecting the AI's Memory
+##  Inspecting the AI's Memory
 
 The SQLite audit log (`memory.db`) persists on the host via a Docker bind mount. Query it directly:
 
@@ -432,7 +430,7 @@ sqlite3 src/memory.db "SELECT action, COUNT(*) as count FROM action_logs GROUP B
 
 ---
 
-## ⚙️ Configuration Reference
+##  Configuration Reference
 
 | Parameter | File | Default | Purpose |
 |---|---|---|---|
@@ -450,9 +448,8 @@ sqlite3 src/memory.db "SELECT action, COUNT(*) as count FROM action_logs GROUP B
 
 ---
 
-## 📜 License
+##  License
 
 MIT License — Copyright (c) 2026 **Alvin George**
 
 See [LICENSE](LICENSE) for full text.
-]]>
