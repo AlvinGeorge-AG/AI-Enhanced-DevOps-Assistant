@@ -13,7 +13,7 @@ memory_leak_storage = []
 
 # How long a single /chaos/cpu hit pins the CPU for. Must outlast the
 # alert's `for:` duration plus the rate() lookback (see alert_rules.yml).
-CPU_SPIKE_DURATION_SECONDS = 90
+CPU_SPIKE_DURATION_SECONDS = 300
 
 # Thread count: oversubscribe relative to available cores so every core
 # has more than one runnable thread fighting for it at all times. Even

@@ -38,5 +38,5 @@ class ContextBuilder:
                 except Exception:
                     state[key] = None if key in UNKNOWN_ON_EMPTY else 0.0
 
-        state["recent_history"] = get_recent_logs(limit=3)
+        state["recent_history"] = get_recent_logs(limit=5)
         return state
